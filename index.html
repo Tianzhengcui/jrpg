@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JRPG + Joystick</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- 游戏画布 -->
+<canvas id="game" width="640" height="360"></canvas>
+
+<!-- 仅显示摇杆坐标（-1~1） -->
+<div id="output">x: 0<br>y: 0</div>
+
+<!-- 虚拟摇杆 -->
+<div id="stick">
+  <div class="base"></div>
+  <div class="knob"></div>
+</div>
+
+<!-- 入口脚本（ES Module，支持 import） -->
+<script type="module" src="js/main.js"></script>
+
+</body>
+</html>

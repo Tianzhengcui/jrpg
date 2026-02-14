@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>JRPG Map Editor</title>
+  <style>
+    body { margin: 0; font-family: sans-serif; }
+    .wrap { display: flex; height: 100vh; }
+    .left { width: 320px; border-right: 1px solid #ddd; padding: 12px; box-sizing: border-box; overflow:auto; }
+    .main { flex: 1; padding: 12px; box-sizing: border-box; overflow:auto; }
+    canvas { image-rendering: pixelated; border: 1px solid #888; }
+    .row { margin: 10px 0; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    input[type="number"] { width: 80px; }
+    textarea { width: 100%; height: 160px; font-family: monospace; }
+    .hint { font-size: 12px; color: #444; line-height: 1.4; }
+    .badge { padding: 2px 6px; border-radius: 6px; background: #eee; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="left">
+      <h3>瓦片选择</h3>
+      <div class="row">
+        <span class="badge" id="modeBadge">模式：地形</span>
+      </div>
+
+      <div class="row">
+        <label>tileSize</label>
+        <input id="tileSize" type="number" value="32" min="8" max="128" step="1">
+      </div>
+
+      <div class="row">
+        <label>列</label><input id="mapW" type="number" value="20" min="1" max="1000">
+        <label>行</label><input id="mapH" type="number" value="15" min="1" max="1000">
+        <button id="resizeBtn">重建地图</button>
+      </div>
+
+      <div class="row">
+        <label>tiles.png 路径</label>
+      </div>
+      <div class="row">
+        <input id="tilesPath" value="./assets/tiles.png" style="width: 100%;">
+      </div>
+      <div class="row">
+        <button id="loadTilesBtn">加载瓦片图</button>
+      </div>
+
+      <canvas id="palette" width="256" height="256"></canvas>
+
+      <div class="row hint">
+        左键：绘制　右键：擦除(-1)<br>
+        <b>C</b>：切换碰撞编辑　<b>G</b>：切换地形编辑<br>
+        碰撞编辑：左键=设墙(1) / 再点=取消墙(0)<br>
+      </div>
+
+      <hr>
+
+      <h3>导入 / 导出 JSON</h3>
+      <div class="row">
+        <button id="exportBtn">导出到文本框</button>
+        <button id="importBtn">从文本框导入</button>
+        <button id="downloadBtn">下载 map.json</button>
+      </div>
+      <textarea id="jsonBox" placeholder="这里会放导出的 JSON，或粘贴 JSON 后导入"></textarea>
+    </div>
+
+    <div class="main">
+      <h3>地图编辑区</h3>
+      <canvas id="mapCanvas" width="640" height="480"></canvas>
+      <div class="row hint" id="statusText"></div>
+    </div>
+  </div>
+
+  <script type="module" src="./editor.js"></script>
+</body>
+</html>
