@@ -1,6 +1,8 @@
 // editor.js
 // 一个最小可用的 tile + collision 编辑器
 
+//import { draw } from "./js/draw";
+
 const palette = document.getElementById("palette");
 const pctx = palette.getContext("2d");
 const mapCanvas = document.getElementById("mapCanvas");
@@ -18,6 +20,10 @@ const downloadBtn = document.getElementById("downloadBtn");
 const jsonBox = document.getElementById("jsonBox");
 const modeBadge = document.getElementById("modeBadge");
 const statusText = document.getElementById("statusText");
+const drawSQ = document.getElementById("drawSQ");
+const drawCir = document.getElementById("drawCir");
+const showMode = document.getElementById("showMode");
+const drawBig2 = document.getElementById("drawBig2")
 
 ctx.imageSmoothingEnabled = false;
 pctx.imageSmoothingEnabled = false;
@@ -37,6 +43,24 @@ let collision2D = [];
 let paletteCols = 0;       // tileset 每行多少 tile
 let selectedTile = 0;      // 当前选择的 tile index
 let editMode = "ground";   // "ground" or "collision"
+let tool = "brush";          // "brush" | "rect"
+let rectStart = null;        // {x,y} 起点tile
+let rectPreview = null;      // {x0,y0,x1,y1} 预览范围
+let zoom = 1;          // 当前缩放倍数
+const ZOOM_MIN = 0.5;
+const ZOOM_MAX = 4;
+
+function applyZoom(){
+  // 地图画布显示缩放
+  mapCanvas.style.width  = (mapCanvas.width  * zoom) + "px";
+  mapCanvas.style.height = (mapCanvas.height * zoom) + "px";
+
+  // 如果你也想让 palette 同步缩放（可选）
+  palette.style.width  = (palette.width  * zoom) + "px";
+  palette.style.height = (palette.height * zoom) + "px";
+}
+
+
 
 // ---------- utils ----------
 function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
@@ -69,6 +93,7 @@ function loadTiles(src){
 
     redrawPalette();
     redrawAll();
+    applyZoom();
   };
   tilesImg.onerror = () => {
     tilesLoaded = false;
@@ -152,6 +177,7 @@ function redrawAll(){
     drawMap();
     if(editMode === "collision") drawCollisionOverlay();
     updateStatus();
+    applyZoom();
 }
 
 function updateStatus(){
@@ -220,14 +246,76 @@ let painting = false;
 mapCanvas.addEventListener("mousedown", (e) => {
   painting = true;
   applyAtCanvas(e);
+  if (drawShape === "sq"){
+    istodraw = true;
+    SQ1 = getTileFromEvent(e);
+  }
 });
+function getTileFromEvent(e){
+  const rect = mapCanvas.getBoundingClientRect();
+  const mx = (e.clientX - rect.left) * (mapCanvas.width / rect.width);
+  const my = (e.clientY - rect.top)  * (mapCanvas.height / rect.height);
 
-window.addEventListener("mouseup", () => painting = false);
+  // 就算鼠标在画布外，也钳制到边界，确保能收尾
+  const tx = clamp(Math.floor(mx / TILE), 0, mapW - 1);
+  const ty = clamp(Math.floor(my / TILE), 0, mapH - 1);
+  return [tx, ty ];
+}
+
+window.addEventListener("mouseup", (e) => {
+  painting = false;
+  applyAtCanvas(e);
+  if(drawShape === "sq") SQdrawing(e);
+  
+});
+function Bigdraw(e){
+  let point = getTileFromEvent(e);
+  if(true){
+    ground[point[1]][point[0]] = selectedTile;
+    ground[point[1] +1][point[0]+1] = selectedTile;
+    ground[point[1]+1][point[0]+2] = selectedTile;
+    ground[point[1]+2][point[0]+1] = selectedTile;
+    ground[point[1]+0][point[0]+2] = selectedTile;
+    ground[point[1]+2][point[0]+0] = selectedTile;
+    ground[point[1]][point[0]+1] = selectedTile;
+    ground[point[1]+1][point[0]-1] = selectedTile;
+    ground[point[1]][point[0]-1] = selectedTile;
+    ground[point[1]-1][point[0]] = selectedTile;
+    ground[point[1]-1][point[0]+1] = selectedTile;
+  }
+  redrawAll();
+
+}
+function SQdrawing(e){
+  SQ2 = getTileFromEvent(e);
+  if(SQ1[0]> SQ2[0]){
+    let sq3 = SQ1[0];
+    SQ1[0] = SQ2[0];
+    SQ2[0] = sq3
+  }
+  if(SQ1[1]> SQ2[1]){
+    let sq3 = SQ1[1];
+    SQ1[1] = SQ2[1];
+    SQ2[1] = sq3
+  }
+  SQQ = [SQ1, SQ2];
+  istodraw = true;
+    if(drawShape === "sq" && istodraw){
+      for(let iy = 0; iy <= Math.abs(SQQ[1][1] - SQQ[0][1]);iy++){
+        for(let i = 0; i <= Math.abs(SQQ[1][0] - SQQ[0][0]);i++){
+            ground[SQQ[1][1]- iy][SQQ[1][0] - i] = selectedTile
+        }
+      }
+      istodraw = false;
+    }
+  redrawAll(); 
+}
 
 mapCanvas.addEventListener("mousemove", (e) => {
   if(!painting) return;
   // 左键拖动涂，右键拖动擦
   applyAtCanvas(e);
+  if(drawShape === "big") Bigdraw(e);
 });
 
 window.addEventListener("keydown", (e) => {
@@ -297,8 +385,21 @@ function importJSON(){
   mapWEl.value = String(mapW);
   mapHEl.value = String(mapH);
 
+  // ground：二维 int
   ground = obj.layers.ground;
-  collision = obj.layers.collision;
+
+  // collision：把 string[] 转回二维 0/1
+  const col = obj.layers.collision;
+
+  if(Array.isArray(col) && typeof col[0] === "string"){
+    collision2D = collisionStringsTo2D(col, mapW);
+  }else if(Array.isArray(col) && Array.isArray(col[0])){
+    // 兼容：如果有人存的是二维数组
+    collision2D = col;
+  }else{
+    alert("layers.collision 格式不支持（应为 string[] 或 2D array）");
+    return;
+  }
 
   mapCanvas.width = mapW * TILE;
   mapCanvas.height = mapH * TILE;
@@ -324,6 +425,69 @@ function downloadJSON(){
   a.remove();
   URL.revokeObjectURL(url);
 }
+let drawShape = "none";
+let SQ1 = [-1,-1];
+let SQ2 = [-1,-1];
+let SQQ = [SQ1, SQ2];
+let SQed = [0, 0];
+let istodraw = false;
+function pointNumber(){
+  if(SQ1[0]!== -1 && SQ2[0] != -1){
+    return 2
+  }
+  if(SQ1[0]=== -1 && SQ2[0] === -1){
+    return 0
+  }
+  if(SQ1[0]!== -1){
+    return 1
+  }
+}
+function drawBig1(){
+  if(drawShape !== "big"){
+    drawShape = "big";
+
+    showMode.textContent = "绘制模式：大号笔"
+    return 0;
+  }
+  else if (drawShape === "big"){
+    drawShape = "none";
+    showMode.textContent = "绘制模式：默认"
+    console.log("DRAWSHAPE   ", drawShape, "SQED   ", SQed);
+    return 0;
+  }
+}
+function drawSQ1(){
+  if(drawShape !== "sq"){
+    drawShape = "sq";
+    console.log("DRAWSHAPE   ", drawShape, "SQED   ", SQed);
+    showMode.textContent = "绘制模式： 方形"
+    return 0;
+  }
+  else if (drawShape === "sq"){
+    drawShape = "none";
+    showMode.textContent = "绘制模式：默认"
+    console.log("DRAWSHAPE   ", drawShape, "SQED   ", SQed);
+    return 0;
+  }
+
+
+  console.log("SQ1   ", SQ1, "SQ2   ", SQ2  ,"SQQ   ", SQQ, "DRAWSHAPE   ", drawShape, "SQED   ", SQed);
+
+}
+mapCanvas.addEventListener("wheel", (e) => {
+  // 想要“按住Ctrl才缩放”就打开下面这一句
+  // if(!e.ctrlKey) return;
+
+  e.preventDefault();
+
+  const step = 1.1;
+  if(e.deltaY < 0) zoom *= step;  // 向上滚：放大
+  else zoom /= step;             // 向下滚：缩小
+
+  zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoom));
+  applyZoom();
+}, { passive: false });
+
 
 // ---------- ui wiring ----------
 resizeBtn.addEventListener("click", rebuildMap);
@@ -331,6 +495,9 @@ loadTilesBtn.addEventListener("click", () => loadTiles(tilesPathEl.value));
 exportBtn.addEventListener("click", exportJSON);
 importBtn.addEventListener("click", importJSON);
 downloadBtn.addEventListener("click", downloadJSON);
+drawSQ.addEventListener("click", drawSQ1);
+if(drawBig2) drawBig2.addEventListener("click", drawBig1);
+//drawCir.addEventListener("click", drawCir);
 
 // ---------- boot ----------
 rebuildMap();
