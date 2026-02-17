@@ -37,11 +37,11 @@ const keys = {};
 export let map = ground;
 export let canInteract = false;
 let targetEnemy = null;
-export const player2 = {x:64,y:64,speed:2};
+export const player2 = {x:640,y:64,speed:2};
 
 export const player = {
-    x:64,
-    y:64,
+    x:540,
+    y:540,
     w:28,
     h:50,
     speed:2,
